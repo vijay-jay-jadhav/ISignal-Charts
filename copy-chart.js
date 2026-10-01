@@ -2,11 +2,6 @@
 (function () {
   'use strict';
 
-  var ISIGNAL_ORIGINS = [
-    'https://isignal.in',
-    'https://www.isignal.in'
-  ];
-
   function getHeight() {
     var body = document.body;
     var html = document.documentElement;
@@ -19,42 +14,10 @@
     ));
   }
 
-  function sendHeight() {
-    if (!window.parent || window.parent === window) return;
-
-    var height = getHeight();
-    var message = {
-      type: 'isignal-chart-height',
-      height: height
-    };
-
-    ISIGNAL_ORIGINS.forEach(function (origin) {
-      window.parent.postMessage(message, origin);
-    });
-  }
-
-  function startHeightReporter() {
-    sendHeight();
-
-    if (window.ResizeObserver) {
-      var observer = new ResizeObserver(function () {
-        sendHeight();
-      });
-      observer.observe(document.documentElement);
-      if (document.body) observer.observe(document.body);
-    }
-
-    window.addEventListener('load', sendHeight);
-    window.addEventListener('resize', sendHeight);
-
-    [100, 300, 600, 1000, 1500].forEach(function (delay) {
-      setTimeout(sendHeight, delay);
-    });
-  }
-
   function makeEmbedCode() {
     var src = window.location.href.split('#')[0];
-    return '<iframe src="' + src + '" width="100%" frameborder="0" scrolling="no"></iframe>';
+    var height = Math.max(200, getHeight() + 2);
+    return '<iframe src="' + src + '" width="100%" height="' + height + '" frameborder="0" scrolling="no"></iframe>';
   }
 
   function fallbackCopy(text, button) {
@@ -127,7 +90,6 @@
   function start() {
     addStyles();
     addCopyButton();
-    startHeightReporter();
   }
 
   if (document.readyState === 'loading') {

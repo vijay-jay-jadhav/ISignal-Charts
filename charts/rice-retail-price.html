@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rice retail prices</title>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;700&family=Fira+Sans+Condensed:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#f7f4f3; }
+  .vis-rice-retail-price { max-width:700px; margin:0 auto; padding:24px; background:#f7f4f3; }
+  .vis-rice-retail-price * { box-sizing:border-box; font-family:'Fira Sans', sans-serif; }
+  .vis-rice-retail-price .eyebrow { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .vis-rice-retail-price .eyebrow .tick { width:18px; height:3px; background:#e27a36; }
+  .vis-rice-retail-price .eyebrow span { font-size:11px; font-weight:700; color:#e27a36; text-transform:uppercase; letter-spacing:0.08em; font-family:'Fira Sans Condensed', sans-serif; }
+  .vis-rice-retail-price h1 { font-size:34px; font-weight:700; color:#262626; margin:0 0 8px; line-height:1.15; }
+  .vis-rice-retail-price .sub { font-size:19px; color:#262626; margin:0 0 16px; line-height:1.35; }
+  .vis-rice-retail-price .filters { display:flex; gap:8px; margin:0 0 14px; flex-wrap:wrap; }
+  .vis-rice-retail-price .filters button { font-family:'Fira Sans Condensed', sans-serif; font-size:15px; font-weight:700; padding:8px 16px; border:2px solid #142157; background:transparent; color:#142157; border-radius:4px; cursor:pointer; }
+  .vis-rice-retail-price .filters button.active { background:#142157; color:#ffffff; }
+  .vis-rice-retail-price .chart-box { position:relative; width:100%; }
+  .vis-rice-retail-price .foot { display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin-top:8px; }
+  .vis-rice-retail-price .src { font-size:12px; color:#898989; margin:0; line-height:1.5; }
+  .vis-rice-retail-price .src a { color:#898989; }
+  @media (max-width:480px) {
+    .vis-rice-retail-price { padding:16px; }
+    .vis-rice-retail-price h1 { font-size:24px; }
+    .vis-rice-retail-price .sub { font-size:15px; }
+    .vis-rice-retail-price .filters button { font-size:13px; padding:7px 12px; }
+  }
+</style>
+</head>
+<body>
+<div class="vis-rice-retail-price">
+  <div class="eyebrow"><div class="tick"></div><span>ISignal Charts</span></div>
+  <h1 id="title-rice-retail-price"></h1>
+  <p class="sub" id="sub-rice-retail-price"></p>
+  <div class="filters" role="group" aria-label="Choose view">
+    <button type="button" data-view="sept" class="active" aria-pressed="true">Avg Sept Month</button>
+    <button type="button" data-view="y2026" aria-pressed="false">Year 2026</button>
+  </div>
+  <div class="chart-box"><canvas id="chart-rice-retail-price"></canvas></div>
+  <div class="foot">
+    <p class="src"><strong>Source:</strong> <a href="https://foodprices.indiaspend.com" target="_blank" rel="noopener noreferrer">Food Price Watch</a></p>
+    <a href="https://www.indiaspend.com/" target="_blank" rel="noopener noreferrer" style="flex-shrink:0; display:inline-block; line-height:0;">
+      <img src="https://www.indiaspend.com/images/logo.svg?v=1" alt="IndiaSpend" style="height:24px; width:auto; display:block;">
+    </a>
+  </div>
+</div>
+
+<script>
+(function () {
+  var VIEWS = {
+    sept: { title: 'September Rice Prices Rose Steadily Over Six Years',
+            sub: 'Average retail price increased from Rs 35.1 per kg in September 2021 to Rs 46.1 in September 2026',
+            labels: ['2021','2022','2023','2024','2025','2026'],
+            values: [35.1,38.0,42.2,43.3,42.8,46.1], highlight: -1 },
+    y2026: { title: 'September Rice Prices Rose Steadily Over Six Years',
+             sub: 'Average retail price increased from Rs 35.1 per kg in September 2021 to Rs 46.1 in September 2026',
+             labels: ['May','Jun','Jul','Aug','Sep'],
+             values: [42.9,43.4,44.4,45.4,46.1], highlight: -1 }
+  };
+  var current = 'sept';
+  var labels, values, highlight;
+  function setView(v) {
+    current = v; var d = VIEWS[v];
+    labels = d.labels; values = d.values; highlight = d.highlight;
+    document.getElementById('title-rice-retail-price').textContent = d.title;
+    document.getElementById('sub-rice-retail-price').textContent = d.sub;
+    document.querySelectorAll('.vis-rice-retail-price .filters button').forEach(function (b) {
+      var on = b.getAttribute('data-view') === v;
+      b.classList.toggle('active', on); b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+  setView('sept');
+  var NAVY = '#142157';
+  var FADED = 'rgba(20,33,87,0.4)';
+
+  function isMobile() { return window.innerWidth < 480; }
+  function sizes() {
+    var m = isMobile();
+    return { tick: m ? 12 : 15, label: m ? 12 : 15, axisTitle: m ? 10 : 13,
+             radius: m ? 4 : 5, hiRadius: m ? 6 : 7, line: m ? 2.5 : 3,
+             aspect: m ? 1.4 : 2 };
+  }
+
+  // Inline value labels: above each point, below it when the point is a local dip
+  var valueLabels = {
+    id: 'valueLabels',
+    afterDatasetsDraw: function (chart) {
+      var s = sizes();
+      var ctx = chart.ctx;
+      var meta = chart.getDatasetMeta(0);
+      ctx.save();
+      ctx.font = '700 ' + s.label + "px 'Fira Sans Condensed', sans-serif";
+      ctx.fillStyle = NAVY;
+      ctx.textAlign = 'center';
+      meta.data.forEach(function (pt, i) {
+        var v = values[i];
+        var prev = i > 0 ? values[i - 1] : null;
+        var next = i < values.length - 1 ? values[i + 1] : null;
+        var dip = (prev === null || prev > v) && (next === null || next > v) && (prev !== null || next !== null) && !(prev === null && next > v && i === 0 && values.length > 1 && false);
+        if (i === 0 || i === values.length - 1) dip = false;
+        var gap = s.hiRadius + 8;
+        if (dip) { ctx.textBaseline = 'top'; ctx.fillText('Rs ' + v.toLocaleString('en-IN',{minimumFractionDigits:1,maximumFractionDigits:1}), pt.x, pt.y + gap); }
+        else { ctx.textBaseline = 'bottom'; ctx.fillText('Rs ' + v.toLocaleString('en-IN',{minimumFractionDigits:1,maximumFractionDigits:1}), pt.x, pt.y - gap); }
+      });
+      ctx.restore();
+    }
+  };
+
+  function pointColors() {
+    return values.map(function (_, i) { return (highlight < 0 || i === highlight) ? NAVY : FADED; });
+  }
+  function pointRadii(s) {
+    return values.map(function (_, i) { return i === highlight ? s.hiRadius : s.radius; });
+  }
+
+  function build() {
+    var s = sizes();
+    var ctx = document.getElementById('chart-rice-retail-price').getContext('2d');
+    return new Chart(ctx, {
+      type: 'line',
+      data: { labels: labels, datasets: [{
+        data: values,
+        borderColor: NAVY, borderWidth: s.line, tension: 0,
+        pointBackgroundColor: pointColors(), pointBorderColor: pointColors(),
+        pointBorderWidth: 0, pointRadius: pointRadii(s), pointHoverRadius: pointRadii(s)
+      }]},
+      options: {
+        responsive: true, maintainAspectRatio: true, aspectRatio: s.aspect,
+        animation: false,
+        layout: { padding: { top: 30, right: 8, left: 0, bottom: 0 } },
+        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+        events: [],
+        scales: {
+          x: {
+            offset: true,
+            border: { color: '#262626' },
+            grid: { display: false },
+            ticks: { color: '#262626', font: { family: "'Fira Sans Condensed', sans-serif", size: s.tick } }
+          },
+          y: {
+            min: 0, max: 60,
+            border: { display: false },
+            grid: { color: 'rgba(0,0,0,0.06)', drawTicks: false },
+            ticks: { stepSize: 10, padding: 4, color: '#262626',
+                     font: { family: "'Fira Sans Condensed', sans-serif", size: s.tick } },
+            title: { display: true, text: 'Average retail price (Rs/kg)', color: '#262626',
+                     font: { family: "'Fira Sans Condensed', sans-serif", size: s.axisTitle, weight: 700, lineHeight: 1 },
+                     padding: { top: 0, bottom: 2 } }
+          }
+        }
+      },
+      plugins: [valueLabels]
+    });
+  }
+
+  function start() {
+    var chart = build();
+    var wasMobile = isMobile();
+    document.querySelectorAll('.vis-rice-retail-price .filters button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var v = b.getAttribute('data-view');
+        if (v === current) return;
+        setView(v); chart.destroy(); chart = build();
+      });
+    });
+    window.addEventListener('resize', function () {
+      if (isMobile() !== wasMobile) { wasMobile = isMobile(); chart.destroy(); chart = build(); }
+    });
+  }
+
+  function whenReady() {
+    if (document.fonts && document.fonts.ready) { document.fonts.ready.then(start); } else { start(); }
+  }
+  if (window.Chart) { whenReady(); }
+  else {
+    var existing = document.querySelector('script[data-chartjs]');
+    if (existing) { existing.addEventListener('load', whenReady); }
+    else {
+      var sc = document.createElement('script');
+      sc.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
+      sc.setAttribute('data-chartjs', '1');
+      sc.onload = whenReady;
+      document.head.appendChild(sc);
+    }
+  }
+})();
+</script>
+</body>
+</html>

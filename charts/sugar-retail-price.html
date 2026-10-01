@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sugar Prices Rose by Rs 10.7 per kg in August Before Easing in September</title>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;700&family=Fira+Sans+Condensed:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#ffffff; }
+  .vis-sugar-retail-price { max-width:700px; margin:0 auto; padding:24px; background:#ffffff; }
+  .vis-sugar-retail-price * { box-sizing:border-box; font-family:'Fira Sans', sans-serif; }
+  .vis-sugar-retail-price .eyebrow { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .vis-sugar-retail-price .eyebrow .tick { width:18px; height:3px; background:#e27a36; }
+  .vis-sugar-retail-price .eyebrow span { font-size:11px; font-weight:700; color:#e27a36; text-transform:uppercase; letter-spacing:0.08em; font-family:'Fira Sans Condensed', sans-serif; }
+  .vis-sugar-retail-price h1 { font-size:34px; font-weight:700; color:#262626; margin:0 0 8px; line-height:1.15; }
+  .vis-sugar-retail-price .sub { font-size:19px; color:#262626; margin:0 0 16px; line-height:1.35; }
+  .vis-sugar-retail-price .chart-box { position:relative; width:100%; }
+  .vis-sugar-retail-price .foot { display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin-top:8px; }
+  .vis-sugar-retail-price .src { font-size:12px; color:#898989; margin:0; line-height:1.5; }
+  .vis-sugar-retail-price .src a { color:#898989; }
+  @media (max-width:480px) {
+    .vis-sugar-retail-price { padding:16px; }
+    .vis-sugar-retail-price h1 { font-size:24px; }
+    .vis-sugar-retail-price .sub { font-size:15px; }
+  }
+</style>
+</head>
+<body>
+<div class="vis-sugar-retail-price">
+  <div class="eyebrow"><div class="tick"></div><span>ISignal Charts</span></div>
+  <h1>Sugar Prices Rose by Rs 10.7 per kg in August Before Easing in September</h1>
+  <p class="sub">Average retail price rose from Rs 46.2 per kg in January to Rs 59.2 in September, after reaching Rs 61.8 in August</p>
+  <div class="chart-box"><canvas id="chart-sugar-retail-price"></canvas></div>
+  <div class="foot">
+    <p class="src"><strong>Source:</strong> <a href="https://foodprices.indiaspend.com" target="_blank" rel="noopener noreferrer">Food Price Watch</a></p>
+    <a href="https://www.indiaspend.com/" target="_blank" rel="noopener noreferrer" style="flex-shrink:0; display:inline-block; line-height:0;">
+      <img src="https://www.indiaspend.com/images/logo.svg?v=1" alt="IndiaSpend" style="height:24px; width:auto; display:block;">
+    </a>
+  </div>
+</div>
+
+<script>
+(function () {
+  var labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep"];
+  var values = [46.2, 46.7, 47.2, 47.5, 48.0, 48.5, 51.1, 61.8, 59.2];
+  var highlight = 7; // index to keep at full strength, -1 for none
+  var NAVY = '#142157';
+  var FADED = 'rgba(20,33,87,0.4)';
+
+  function isMobile() { return window.innerWidth < 480; }
+  function sizes() {
+    var m = isMobile();
+    return { tick: m ? 12 : 15, label: m ? 12 : 15, axisTitle: m ? 10 : 13,
+             radius: m ? 4 : 5, hiRadius: m ? 6 : 7, line: m ? 2.5 : 3,
+             aspect: m ? 1.4 : 2 };
+  }
+
+  // Inline value labels: above each point, below it when the point is a local dip
+  var valueLabels = {
+    id: 'valueLabels',
+    afterDatasetsDraw: function (chart) {
+      var s = sizes();
+      var ctx = chart.ctx;
+      var meta = chart.getDatasetMeta(0);
+      ctx.save();
+      ctx.font = '700 ' + s.label + "px 'Fira Sans Condensed', sans-serif";
+      ctx.fillStyle = NAVY;
+      ctx.textAlign = 'center';
+      var mobileKeep = [0, 7, 8];
+      meta.data.forEach(function (pt, i) {
+        if (isMobile() && mobileKeep.indexOf(i) < 0) return;
+        var v = values[i];
+        var prev = i > 0 ? values[i - 1] : null;
+        var next = i < values.length - 1 ? values[i + 1] : null;
+        var dip = (prev === null || prev > v) && (next === null || next > v) && (prev !== null || next !== null) && !(prev === null && next > v && i === 0 && values.length > 1 && false);
+        if (i === 0 || i === values.length - 1) dip = false;
+        if (isMobile() && i === values.length - 1 && values[i - 1] > v) dip = true;
+        var gap = s.hiRadius + 8;
+        if (dip) { ctx.textBaseline = 'top'; ctx.fillText('Rs ' + v.toLocaleString('en-IN',{minimumFractionDigits:1,maximumFractionDigits:1}), pt.x, pt.y + gap); }
+        else { ctx.textBaseline = 'bottom'; ctx.fillText('Rs ' + v.toLocaleString('en-IN',{minimumFractionDigits:1,maximumFractionDigits:1}), pt.x, pt.y - gap); }
+      });
+      ctx.restore();
+    }
+  };
+
+  function pointColors() {
+    return values.map(function (_, i) { return (highlight < 0 || i === highlight) ? NAVY : FADED; });
+  }
+  function pointRadii(s) {
+    return values.map(function (_, i) { return i === highlight ? s.hiRadius : s.radius; });
+  }
+
+  function build() {
+    var s = sizes();
+    var ctx = document.getElementById('chart-sugar-retail-price').getContext('2d');
+    return new Chart(ctx, {
+      type: 'line',
+      data: { labels: labels, datasets: [{
+        data: values,
+        borderColor: NAVY, borderWidth: s.line, tension: 0,
+        pointBackgroundColor: pointColors(), pointBorderColor: pointColors(),
+        pointBorderWidth: 0, pointRadius: pointRadii(s), pointHoverRadius: pointRadii(s)
+      }]},
+      options: {
+        responsive: true, maintainAspectRatio: true, aspectRatio: s.aspect,
+        animation: false,
+        layout: { padding: { top: 30, right: 8, left: 0, bottom: 0 } },
+        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+        events: [],
+        scales: {
+          x: {
+            offset: true,
+            border: { color: '#262626' },
+            grid: { display: false },
+            ticks: { color: '#262626', font: { family: "'Fira Sans Condensed', sans-serif", size: s.tick } }
+          },
+          y: {
+            min: 0, max: 70,
+            border: { display: false },
+            grid: { color: 'rgba(0,0,0,0.06)', drawTicks: false },
+            ticks: { stepSize: 10, padding: 4, color: '#262626',
+                     font: { family: "'Fira Sans Condensed', sans-serif", size: s.tick } },
+            title: { display: true, text: 'Average retail price (Rs/kg)', color: '#262626',
+                     font: { family: "'Fira Sans Condensed', sans-serif", size: s.axisTitle, weight: 700, lineHeight: 1 },
+                     padding: { top: 0, bottom: 2 } }
+          }
+        }
+      },
+      plugins: [valueLabels]
+    });
+  }
+
+  function start() {
+    var chart = build();
+    var wasMobile = isMobile();
+    window.addEventListener('resize', function () {
+      if (isMobile() !== wasMobile) { wasMobile = isMobile(); chart.destroy(); chart = build(); }
+    });
+  }
+
+  function whenReady() {
+    if (document.fonts && document.fonts.ready) { document.fonts.ready.then(start); } else { start(); }
+  }
+  if (window.Chart) { whenReady(); }
+  else {
+    var existing = document.querySelector('script[data-chartjs]');
+    if (existing) { existing.addEventListener('load', whenReady); }
+    else {
+      var sc = document.createElement('script');
+      sc.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
+      sc.setAttribute('data-chartjs', '1');
+      sc.onload = whenReady;
+      document.head.appendChild(sc);
+    }
+  }
+})();
+</script>
+</body>
+</html>
